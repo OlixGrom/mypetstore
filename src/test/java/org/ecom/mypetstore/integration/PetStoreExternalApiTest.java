@@ -1,7 +1,12 @@
 package org.ecom.mypetstore.integration;
 
+import io.qameta.allure.Step;
+import org.ecom.mypetstore.MypetstoreApplication;
+import org.ecom.mypetstore.client.PetStoreApiClient;
 import org.ecom.mypetstore.model.external.Pet;
+import org.ecom.mypetstore.steps.PetStoreApiSteps;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -12,10 +17,11 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
 
+
 /**
  * Тест обращения к внешнему API https://petstore.swagger.io/
  */
-@SpringBootTest
+@SpringBootTest(classes = MypetstoreApplication.class)
 public class PetStoreExternalApiTest {
     private static final Logger logger = LoggerFactory.getLogger(PetStoreExternalApiTest.class);
 
@@ -23,16 +29,33 @@ public class PetStoreExternalApiTest {
     private RestTemplate restTemplate; // бин из RestTemplateConfig
 
     @Autowired
+    private PetStoreApiSteps petStoreApiSteps;
+
+    @Autowired
     private PetStoreApiClient petStoreApiClient;
 
+    @BeforeEach
+    void checkClient() {
+        Assertions.assertNotNull(petStoreApiClient, "petStoreApiClient не внедрён!");
+    }
 
     @Test
     @DisplayName("Проверка получения питомца по ID через внешний API")
-    void testGetPetById() {
-        ResponseEntity<Pet> response = petStoreApiClient.getPetById(1L);
-        Assertions.assertEquals(HttpStatus.OK, response.getStatusCode(), "Статус ответа должен быть 200 OK");
-        Assertions.assertNotNull(response.getBody(), "Тело ответа не должно быть пустым");
-        Assertions.assertEquals(1L, response.getBody().getId(), "ID питомца должен быть 1");
+    public void testGetPetById() {
+        logger.info("petStoreApiClient is {}", petStoreApiClient);
+        Assertions.assertNotNull(petStoreApiClient, "petStoreApiClient не инициализирован!");
+
+        logger.info("petStoreApiClient is {}", petStoreApiClient);
+        Assertions.assertNotNull(petStoreApiClient, "petStoreApiClient не инициализирован!");
+
+        // Шаг 1: Отправка запроса
+        ResponseEntity<Pet> response = petStoreApiSteps.sendGetPetByIdRequest(1L);
+
+        // Шаг 2: Проверка статуса ответа
+        petStoreApiSteps.checkResponseStatus(HttpStatus.OK, response.getStatusCode());
+
+        // Шаг 3: Проверка тела ответа
+        petStoreApiSteps.checkResponseBody(response.getBody(), 1L);
     }
 }
 

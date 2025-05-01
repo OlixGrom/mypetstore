@@ -30,6 +30,7 @@ mvnw.cmd
 
 # Allure
 allure-results/
+.allure/
 
 # Логи и временные файлы
 logs/

@@ -1,4 +1,4 @@
-package org.ecom.mypetstore.integration;
+package org.ecom.mypetstore.client;
 
 import org.ecom.mypetstore.exception.ExternalApiException;
 import org.ecom.mypetstore.model.external.Pet;
@@ -33,6 +33,9 @@ public class PetStoreApiClient {
         headers.set(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE);
         HttpEntity<String> entity = new HttpEntity<>(headers);
 
+        System.out.println("Sending request to: " + url);
+        System.out.println("Request Headers: " + headers);
+
         try {
             ResponseEntity<Pet> response = restTemplate.exchange(
                     url,
@@ -40,13 +43,15 @@ public class PetStoreApiClient {
                     entity,
                     Pet.class
             );
+            System.out.println("Response Status: " + response.getStatusCode());
+            System.out.println("Response Body: " + response.getBody());
 
             logger.info("Ответ получен: статус = {}, тело = {}", response.getStatusCode(), response.getBody());
             return response;
 
         } catch (HttpClientErrorException.NotFound e) {
             logger.error("Питомец с ID {} не найден. Ответ сервера: {}", petId, e.getResponseBodyAsString());
-            throw new ExternalApiException("Питомец не найден", e);
+            throw new ExternalApiException("Питомец не найден!", e);
 
         } catch (HttpServerErrorException e) {
             logger.error("Ошибка сервера при обращении к внешнему API: {}", e.getResponseBodyAsString());

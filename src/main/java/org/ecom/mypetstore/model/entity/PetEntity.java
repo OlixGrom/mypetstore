@@ -29,7 +29,7 @@ public class PetEntity {
     @CollectionTable(name = "pet_photos", joinColumns = @JoinColumn(name = "pet_id"))
     private List<String> photoUrls;
 
-    @ManyToMany(fetch = FetchType.EAGER)
+    @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE}, fetch = FetchType.EAGER)
     @JoinTable(
             name = "pet_tags",
             joinColumns = @JoinColumn(name = "pet_id"),

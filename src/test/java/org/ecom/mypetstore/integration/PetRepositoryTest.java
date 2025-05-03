@@ -9,6 +9,8 @@ import org.ecom.mypetstore.repository.CategoryRepository;
 import org.ecom.mypetstore.repository.PetRepository;
 import org.ecom.mypetstore.repository.TagRepository;
 import org.ecom.mypetstore.service.PetService;
+import org.ecom.mypetstore.steps.PetRepositorySteps;
+import org.ecom.mypetstore.steps.PetStoreApiSteps;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,6 +30,12 @@ import java.util.stream.Collectors;
 @ActiveProfiles("test")
 public class PetRepositoryTest {
     private static final Logger logger = LoggerFactory.getLogger(PetStoreExternalApiTest.class);
+
+    @Autowired
+    private PetStoreApiSteps petStoreApiSteps;
+
+    @Autowired
+    private PetRepositorySteps petRepositorySteps;
 
     @Autowired
     private PetService petService;
@@ -50,51 +58,20 @@ public class PetRepositoryTest {
     @Test
     @DisplayName("Получение питомца из API и сохранение в БД")
     void testSavePetFromApiToDatabase() {
-        // 1. Получаем данные питомца из API
-        ResponseEntity<Pet> response = petStoreApiClient.getPetById(999L);
-        Assertions.assertEquals(HttpStatus.OK, response.getStatusCode(), "Статус код должен быть 200");
-
+        // Шаг 1: Получение питомца из API
+        ResponseEntity<Pet> response = petStoreApiSteps.sendGetPetByIdRequest(900L);
+        petStoreApiSteps.checkResponseStatus(HttpStatus.OK, response.getStatusCode());
         Pet apiPet = response.getBody();
-        Assertions.assertNotNull(apiPet, "Тело ответа не должно быть null");
-        //Assertions.assertEquals(1L, apiPet.getId(), "ID питомца должен быть 1");
+        Assertions.assertNotNull(apiPet, "API вернул null");
 
-        // 2. Сохраняем полученные данные в БД
-        petService.addOrUpdatePetById(apiPet);
+        // Шаг 2: Сохраняем в БД
+        petRepositorySteps.savePetToDatabase(apiPet);
 
-        // 3. Проверяем, что данные сохранились корректно
-        PetEntity savedPet = petRepository.findByExternalId(apiPet.getId())
-                .orElseThrow(() -> new AssertionError("Питомец не найден в БД"));
+        // Шаг 3: Проверка данных в БД
+        PetEntity savedPet = petRepositorySteps.verifyPetSavedInDatabase(apiPet.getId());
+        petRepositorySteps.compareApiAndDatabasePet(apiPet, savedPet);
 
-        Assertions.assertEquals(apiPet.getName(), savedPet.getName(), "Имена питомцев должны совпадать");
-        Assertions.assertEquals(apiPet.getStatus().name(), savedPet.getStatus().getValue().toUpperCase(), "Статусы должны совпадать");
-
-        // Проверяем категорию
-        Assertions.assertNotNull(savedPet.getCategory(), "Категория не должна быть null");
-        Assertions.assertEquals(apiPet.getCategory().getId(), savedPet.getCategory().getExternalId(),
-                "ID категорий должны совпадать");
-        Assertions.assertEquals(apiPet.getCategory().getName(), savedPet.getCategory().getName(),
-                "Названия категорий должны совпадать");
-
-        // Проверяем теги
-        Assertions.assertNotNull(savedPet.getTags(), "Список тегов не должен быть null");
-        Assertions.assertEquals(apiPet.getTags().size(), savedPet.getTags().size(),
-                "Количество тегов должно совпадать");
-
-        List<Long> savedTagIds = savedPet.getTags().stream()
-                .map(TagEntity::getId)
-                .collect(Collectors.toList());
-
-        List<Long> apiTagIds = apiPet.getTags().stream()
-                .map(Tag::getId)
-                .collect(Collectors.toList());
-
-        Assertions.assertTrue(savedTagIds.containsAll(apiTagIds), "Теги должны содержать все ID из API");
-
-        // 4. (Дополнительно) Проверяем преобразование обратно в API модель
-        Pet convertedPet = petService.convertToApiModel(savedPet);
-        Assertions.assertEquals(apiPet.getId(), convertedPet.getId(), "ID должны совпадать");
-        Assertions.assertEquals(apiPet.getName(), convertedPet.getName(), "Имена должны совпадать");
-        Assertions.assertEquals(apiPet.getStatus().name().toUpperCase(), convertedPet.getStatus().name().toUpperCase(), "Статусы должны совпадать");
+        // Шаг 4: Проверка обратной конверсии
+        petRepositorySteps.verifyConversionToApiModel(savedPet, apiPet);
     }
-
 }

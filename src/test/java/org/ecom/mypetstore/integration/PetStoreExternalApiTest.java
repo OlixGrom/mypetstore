@@ -1,6 +1,5 @@
 package org.ecom.mypetstore.integration;
 
-import io.qameta.allure.Step;
 import org.ecom.mypetstore.MypetstoreApplication;
 import org.ecom.mypetstore.client.PetStoreApiClient;
 import org.ecom.mypetstore.model.external.Pet;
@@ -9,10 +8,13 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;

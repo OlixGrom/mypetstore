@@ -11,16 +11,17 @@ import org.ecom.mypetstore.model.external.Tag;
 import org.ecom.mypetstore.repository.CategoryRepository;
 import org.ecom.mypetstore.repository.PetRepository;
 import org.ecom.mypetstore.repository.TagRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.util.Optional;
-
+import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class PetService {
+    private static final Logger logger = LoggerFactory.getLogger(PetService.class);
     private final PetStoreApiClient apiClient;
     private final PetRepository petRepository;
     private final CategoryRepository categoryRepository;
@@ -42,112 +43,57 @@ public class PetService {
         return apiClient.getPetById(id).getBody();
     }
 
-    @Transactional
-    public Pet addPetById(Long id) {
-        Pet apiPet = getPetById(id);
-        savePetToDatabase(apiPet);
-        return apiPet;
-    }
-
-        public Pet convertToApiModel(PetEntity entity) {
+    public Pet convertToApiModel(PetEntity entity) {
         return petMapper.toApiModel(entity);
     }
 
-    // Метод для добавления или обновления питомца по ID
+
+    // Метод для добавления или обновления питомца по ID в БД
     @Transactional
     public Pet addOrUpdatePetById(Pet apiPet) {
-        // Ищем питомца в базе данных по external_id
-        Optional<PetEntity> existingPet = petRepository.findByExternalId(apiPet.getId());
+        validatePet(apiPet); // Добавили валидацию
+        return petRepository.findByExternalId(apiPet.getId())
+                .map(existingPet -> updatePet(existingPet, apiPet))
+                .orElseGet(() -> createPet(apiPet));
+    }
 
-        if (existingPet.isPresent()) {
-            // Если питомец с таким external_id найден, обновляем его информацию
-            PetEntity petEntity = existingPet.get();
-            updatePetEntity(petEntity, apiPet);  // Обновляем поля сущности
-            petRepository.save(petEntity);  // Сохраняем обновленную сущность
-        } else {
-            // Если питомца с таким external_id нет, создаем новый
-            savePetToDatabase(apiPet);  // Вставляем новый питомец
+    private CategoryEntity processCategory(Category category) {
+        return category == null ? null
+                : categoryRepository.findOrCreateCategory(category);
+    }
+
+    private List<TagEntity> processTags(List<Tag> tags) {
+        return tags == null ? Collections.emptyList()
+                : tagRepository.findOrCreateTags(tags);
+    }
+
+    private Pet createPet(Pet apiPet) {
+        PetEntity newPet = petMapper.toPetEntity(apiPet);
+        newPet.setCategory(processCategory(apiPet.getCategory()));
+        newPet.setTags(processTags(apiPet.getTags()));
+        petRepository.save(newPet);
+        logger.info("Created new pet with id: {}", apiPet.getId());
+        return apiPet;
+    }
+
+    private Pet updatePet(PetEntity existingPet, Pet apiPet) {
+        petMapper.updatePetEntity(existingPet, apiPet);
+        existingPet.setCategory(processCategory(apiPet.getCategory()));//-------------------------
+        existingPet.setTags(processTags(apiPet.getTags()));
+        petRepository.save(existingPet);
+        logger.info("Updated pet with id: {}", apiPet.getId());
+        return apiPet;
+    }
+
+    private void validatePet(Pet pet) {
+        if (pet == null || pet.getId() == null) {
+            throw new IllegalArgumentException("Pet or pet ID must not be null");
         }
-
-        return apiPet;  // Возвращаем API модель питомца
-    }
-
-    // Метод для обновления информации о питомце в сущности PetEntity
-    private void updatePetEntity(PetEntity petEntity, Pet apiPet) {
-        petEntity.setName(apiPet.getName());
-        petEntity.setStatus(apiPet.getStatus());
-        petEntity.setPhotoUrls(apiPet.getPhotoUrls());
-
-        // Сохраняем или обновляем категорию
-        CategoryEntity categoryEntity = categoryRepository
-                .findByName(apiPet.getCategory().getName())
-                .orElseGet(() -> categoryRepository.save(petMapper.toCategoryEntity(apiPet.getCategory())));
-
-        // Сохраняем или обновляем теги
-        List<TagEntity> tagEntities = apiPet.getTags().stream()
-                .map(tag -> tagRepository.findByName(tag.getName())
-                        .orElseGet(() -> tagRepository.save(petMapper.toTagEntity(tag))))
-                .collect(Collectors.toList());
-
-        petEntity.setCategory(categoryEntity);
-        petEntity.setTags(tagEntities);
-    }
-
-    // Преобразование API модели в сущность PetEntity
-    public PetEntity toPetEntity(Pet apiPet) {
-        PetEntity entity = new PetEntity();
-        entity.setId(null);
-        entity.setName(apiPet.getName());
-        entity.setStatus(apiPet.getStatus());
-        entity.setPhotoUrls(apiPet.getPhotoUrls());
-        entity.setExternalId(apiPet.getId());
-        entity.setCategory(toCategoryEntity(apiPet.getCategory()));
-        entity.setTags(mapTagsToEntities(apiPet.getTags()));
-        return entity;
-    }
-
-    // Преобразование тега в сущность
-    public List<TagEntity> mapTagsToEntities(List<Tag> tags) {
-        return tags.stream().map(tag -> {
-            TagEntity tagEntity = new TagEntity();
-            tagEntity.setId(tag.getId());
-            tagEntity.setName(tag.getName());
-            return tagEntity;
-        }).collect(Collectors.toList());
-    }
-
-    // Преобразование категории в сущность
-    public CategoryEntity toCategoryEntity(Category category) {
-        CategoryEntity entity = new CategoryEntity();
-        entity.setId(null); // id генерируется автоматически
-        entity.setName(category.getName());
-        entity.setExternalId(category.getId());
-        return entity;
-    }
-
-    /**
-     * Сохраняет питомца, категорию и теги, избегая дубликатов.
-     */
-    public void savePetToDatabase(Pet apiPet) {
-        // 1. Сохраняем категорию (если её нет)
-        CategoryEntity categoryEntity = categoryRepository
-                .findByExternalId(apiPet.getId())
-                .orElseGet(() -> {
-                    CategoryEntity newCategory = petMapper.toCategoryEntity(apiPet.getCategory());
-                    return categoryRepository.save(newCategory);
-                });
-
-        // 2. Сохраняем теги (если их нет)
-        List<TagEntity> tagEntities = apiPet.getTags().stream()
-                .map(tag -> tagRepository.findByName(tag.getName())
-                        .orElseGet(() -> tagRepository.save(petMapper.toTagEntity(tag))))
-                .collect(Collectors.toList());
-
-        // 3. Сохраняем питомца
-        PetEntity petEntity = petMapper.toPetEntity(apiPet);
-        petEntity.setCategory(categoryEntity);
-        petEntity.setTags(tagEntities);
-
-        petRepository.save(petEntity);
+        if (pet.getCategory() == null) {
+            throw new IllegalArgumentException("Pet category must not be null");
+        }
+        if (pet.getTags() == null) {
+            pet.setTags(Collections.emptyList());
+        }
     }
 }

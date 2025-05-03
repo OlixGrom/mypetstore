@@ -1,6 +1,5 @@
 package org.ecom.mypetstore.mapper;
 
-import org.ecom.mypetstore.enums.PetStatus;
 import org.ecom.mypetstore.model.entity.CategoryEntity;
 import org.ecom.mypetstore.model.entity.PetEntity;
 import org.ecom.mypetstore.model.entity.TagEntity;
@@ -26,9 +25,7 @@ public class PetMapper {
         entity.setStatus(apiModel.getStatus());
         entity.setPhotoUrls(apiModel.getPhotoUrls());
         entity.setExternalId(apiModel.getId());
-        entity.setCategory(toCategoryEntity(apiModel.getCategory()));
-        entity.setTags(mapTagsToEntities(apiModel.getTags()));
-
+        entity.setCategory(null);
         return entity;
     }
 
@@ -44,12 +41,11 @@ public class PetMapper {
 
     public TagEntity toTagEntity(Tag tag) {
         if (tag == null) return null;
-
-        TagEntity entity = new TagEntity();
-        entity.setId(tag.getId());
-        entity.setName(tag.getName());
-        return entity;
+        return new TagEntity()
+                .setExternalId(tag.getId())  // Устанавливаем только externalId
+                .setName(tag.getName());
     }
+
 
     public Pet toApiModel(PetEntity entity) {
         if (entity == null) return null;
@@ -72,22 +68,22 @@ public class PetMapper {
         return pet;
     }
 
-    private List<TagEntity> mapTagsToEntities(List<Tag> tags) {
-        if (tags == null) return Collections.emptyList();
-        return tags.stream()
-                .map(this::toTagEntity)
-                .collect(Collectors.toList());
+    public void updatePetEntity(PetEntity existingEntity, Pet apiModel) {
+        if (apiModel == null || existingEntity == null) return;
+
+        existingEntity.setName(apiModel.getName());
+        existingEntity.setStatus(apiModel.getStatus());
+        existingEntity.setPhotoUrls(apiModel.getPhotoUrls());
     }
 
     private List<Tag> mapTagsToApi(List<TagEntity> tagEntities) {
         if (tagEntities == null) return Collections.emptyList();
+
         return tagEntities.stream()
-                .map(te -> {
-                    Tag tag = new Tag();
-                    tag.setId(te.getId());
-                    tag.setName(te.getName());
-                    return tag;
-                })
+                .map(te -> new Tag()
+                        .setId(te.getExternalId())  // Используем externalId
+                        .setName(te.getName()))
                 .collect(Collectors.toList());
     }
+
 }

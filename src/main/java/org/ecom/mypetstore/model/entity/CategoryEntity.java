@@ -11,7 +11,12 @@ import java.util.Optional;
 public class CategoryEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id")
     private Long id;
+
+    @Column(name = "name")
     private String name;
+
+    @Column(name = "external_id")
     private Long externalId;
 }

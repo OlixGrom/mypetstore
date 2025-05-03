@@ -5,37 +5,48 @@ import org.ecom.mypetstore.model.external.Pet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Recover;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestTemplate;
 
+//Для работы с внешним апи
 @Component
 public class PetStoreApiClient {
 
     private static final Logger logger = LoggerFactory.getLogger(PetStoreApiClient.class);
 
     private final RestTemplate restTemplate;
-    private static final String BASE_URL = "https://petstore.swagger.io/v2";
+    private final String baseUrl;
 
     @Autowired
-    public PetStoreApiClient(RestTemplate restTemplate) {
+    public PetStoreApiClient(@Value("${petstore.api.url}") String baseUrl, RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
+        this.baseUrl = baseUrl;
     }
 
+    @Recover
+    public ResponseEntity<Pet> recover(HttpServerErrorException e, Long petId) {
+        logger.error("Failed to get pet after 3 retries, petId: {}", petId);
+        throw new ExternalApiException("Сервер не отвечает после 3 попыток", e);
+    }
 
+    @Retryable(
+            retryFor = { HttpServerErrorException.class },
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000))
     public ResponseEntity<Pet> getPetById(Long petId) {
-        String url = BASE_URL + "/pet/" + petId;
+        String url = baseUrl + "/pet/" + petId;
         logger.info("Отправляем GET запрос к URL: {}", url);
 
         HttpHeaders headers = new HttpHeaders();
         headers.set(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE);
         HttpEntity<String> entity = new HttpEntity<>(headers);
-
-        System.out.println("Sending request to: " + url);
-        System.out.println("Request Headers: " + headers);
-
         try {
             ResponseEntity<Pet> response = restTemplate.exchange(
                     url,
@@ -43,8 +54,6 @@ public class PetStoreApiClient {
                     entity,
                     Pet.class
             );
-            System.out.println("Response Status: " + response.getStatusCode());
-            System.out.println("Response Body: " + response.getBody());
 
             logger.info("Ответ получен: статус = {}, тело = {}", response.getStatusCode(), response.getBody());
             return response;
@@ -62,8 +71,4 @@ public class PetStoreApiClient {
             throw new ExternalApiException("Неизвестная ошибка при обращении к внешнему API", e);
         }
     }
-
-    /*public ResponseEntity<Pet> getPetById(Long id) {
-        return restTemplate.getForEntity("https://petstore.swagger.io/v2/pet/" + id, Pet.class);
-    }*/
 }

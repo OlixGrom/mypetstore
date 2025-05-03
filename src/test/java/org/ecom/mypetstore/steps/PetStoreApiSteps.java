@@ -30,6 +30,20 @@ public class PetStoreApiSteps {
         return response;
     }
 
+    @Step("Отправка запроса на создание нового питомца")
+    public ResponseEntity<Pet> sendCreatePetRequest(Pet pet) {
+        ResponseEntity<Pet> response = petStoreApiClient.createPet(pet);
+        attachJson("Ответ сервера (Создание Pet)", response.getBody());
+        return response;
+    }
+
+    @Step("Отправка запроса на обновление питомца с ID: {pet.id}")
+    public ResponseEntity<Pet> sendUpdatePetRequest(Pet pet) {
+        ResponseEntity<Pet> response = petStoreApiClient.updatePet(pet);
+        attachJson("Ответ сервера (Обновление Pet)", response.getBody());
+        return response;
+    }
+
     @Step("Проверка статуса ответа: ожидается {expectedStatus}, фактически {actualStatus}")
     public void checkResponseStatus(HttpStatus expectedStatus, HttpStatusCode actualStatus) {
         Assertions.assertEquals(expectedStatus, actualStatus, "Статус ответа должен быть 200 OK");

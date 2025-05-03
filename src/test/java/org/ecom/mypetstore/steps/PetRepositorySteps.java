@@ -8,9 +8,7 @@ import org.ecom.mypetstore.model.external.Tag;
 import org.ecom.mypetstore.repository.PetRepository;
 import org.ecom.mypetstore.service.PetService;
 import org.junit.jupiter.api.Assertions;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
-
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -28,6 +26,11 @@ public class PetRepositorySteps {
     @Step("Сохранение питомца в БД")
     public void savePetToDatabase(Pet pet) {
         petService.addOrUpdatePetById(pet);
+    }
+
+    public PetEntity getPetById(Long petId) {
+        return petRepository.findByExternalId(petId)
+                .orElseThrow(() -> new RuntimeException("Pet not found with id: " + petId));
     }
 
     @Step("Проверка, что питомец с ID {externalId} сохранён в базе")
